@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeadScout &mdash; local business lead finder</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/style.css">
+<script>
+  // Apply saved / preferred theme before paint to avoid a flash.
+  (function () {
+    var t = localStorage.getItem("theme");
+    if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="/static/logo.svg" alt="LeadScout logo">
+    <div>
+      <h1>LeadScout</h1>
+      <p class="tagline">Find local businesses that need a website, SEO, or a redesign.</p>
+    </div>
+    <button type="button" id="themeBtn" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+  </header>
+  <hr>
+
+  <!-- ================= SEARCH ================= -->
+  <h2>Find leads</h2>
+  <form class="search" method="post" action="/search">
+    <div class="fields">
+      <div class="field">
+        <label for="city">City</label>
+        <input type="text" id="city" name="city" placeholder="Austin">
+      </div>
+      <div class="field">
+        <label for="state">State / Province</label>
+        <input type="text" id="state" name="state" placeholder="TX">
+      </div>
+      <div class="field">
+        <label for="country">Country</label>
+        <input type="text" id="country" name="country" placeholder="USA">
+      </div>
+      <div class="field">
+        <label for="radius_km">Radius km (optional)</label>
+        <input type="number" id="radius_km" name="radius_km" min="1" max="100" placeholder="e.g. 15" style="min-width:100px">
+      </div>
+      <div class="field">
+        <label for="category">Categories (pick 1+)</label>
+        <select id="category" name="category" multiple size="4">
+          {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="custom_category">…or type any</label>
+        <input type="text" id="custom_category" name="custom_category" placeholder="e.g. pharmacy, barber">
+      </div>
+      <div class="field">
+        <button type="submit">Scan for leads</button>
+      </div>
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label><input type="checkbox" name="all_categories" value="1"> <strong>All categories</strong> (scan every type)</label>
+      &nbsp;&nbsp;&nbsp;
+      <label><input type="checkbox" name="whole_state" value="1"> <strong>Whole state/province</strong> (ignores City &amp; Radius)</label>
+    </div>
+    <p class="small">Free, no API key. <strong>Pick several categories</strong> (Cmd/Ctrl-click in the box), or type any type, or tick “All categories”. Add a <strong>Radius</strong> to search around the city; leave it blank to use the whole city area.</p>
+  </form>
+
+  {% if message %}
+    {% if message.error %}
+      <div class="msg err">{{ message.error }}</div>
+    {% else %}
+      <div class="msg">Found and analysed <strong>{{ message.count }}</strong> businesses (search #{{ message.search_id }}).</div>
+    {% endif %}
+  {% endif %}
+  {% if send_result %}
+    {% if send_result.error %}
+      <div class="msg err">Sent {{ send_result.sent }}. {{ send_result.error }}</div>
+    {% else %}
+      <div class="msg">✉️ Sent <strong>{{ send_result.sent }}</strong> email(s).{% if send_result.skipped %} Skipped {{ send_result.skipped }} (no email address or already emailed).{% endif %}</div>
+    {% endif %}
+  {% endif %}
+
+  <!-- ================= DASHBOARD ================= -->
+  <h2>Dashboard</h2>
+  <div class="tiles">
+    <div class="tile"><div class="num">{{ stats.total }}</div><div class="lbl">Total leads</div></div>
+    <div class="tile hot"><div class="num">{{ stats.high_opp }}</div><div class="lbl">High opportunity</div></div>
+    <div class="tile"><div class="num">{{ stats.no_website }}</div><div class="lbl">No website</div></div>
+    <div class="tile"><div class="num">{{ stats.callable }}</div><div class="lbl">Callable (phone/email)</div></div>
+    <div class="tile"><div class="num">{{ stats.emailable }}</div><div class="lbl">Have email</div></div>
+    <div class="tile"><div class="num">{{ stats.avg_website if stats.avg_website is not none else '—' }}</div><div class="lbl">Avg website score</div></div>
+  </div>
+
+  <!-- ================= FILTERS + EXPORT ================= -->
+  <h2>Leads</h2>
+  <form class="filters" method="get" action="/">
+    <div class="field">
+      <label>Opportunity</label>
+      <select name="opportunity" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for o in ['High','Medium','Low'] %}
+        <option value="{{ o }}" {% if filter_opportunity==o %}selected{% endif %}>{{ o }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Website</label>
+      <select name="has_website" onchange="this.form.submit()">
+        <option value="">All</option>
+        <option value="0" {% if filter_haswebsite=='0' %}selected{% endif %}>No website</option>
+        <option value="1" {% if filter_haswebsite=='1' %}selected{% endif %}>Has website</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Reachable</label>
+      <select name="callable_only" onchange="this.form.submit()">
+        <option value="">All</option>
+        <option value="1" {% if filter_callable=='1' %}selected{% endif %}>Callable only</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select name="category" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for c in categories %}
+        <option value="{{ c }}" {% if filter_category==c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="exports">
+      <a href="/export/csv?opportunity={{ filter_opportunity or '' }}&has_website={{ filter_haswebsite or '' }}&category={{ filter_category or '' }}">Export CSV</a>
+      <a href="/export/xlsx?opportunity={{ filter_opportunity or '' }}&has_website={{ filter_haswebsite or '' }}&category={{ filter_category or '' }}">Export Excel</a>
+    </div>
+  </form>
+
+  {% if not mail_ready %}
+  <div class="msg" style="font-size:12px">
+    ✉️ <strong>Want to send emails from the app?</strong> Add <code>SELLER_EMAIL</code> and
+    <code>SELLER_EMAIL_APP_PASSWORD</code> (a Gmail App Password) to your <code>.env</code>, then restart.
+    Until then, you can still copy or download each draft from a lead's <strong>Sales tools</strong> page.
+  </div>
+  {% endif %}
+
+  <form method="post" action="/send-batch" id="sendForm" onsubmit="return confirmSend()">
+  {% if mail_ready %}
+  <div class="sendbar">
+    <label class="small"><input type="checkbox" id="selectAll"> Select all emailable</label>
+    <button type="submit" class="sendbtn">✉️ Send email to selected</button>
+    <span class="small">Only businesses with an email you haven't emailed yet. Review a draft first on any Sales-tools page.</span>
+  </div>
+  {% endif %}
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr>
+        {% if mail_ready %}<th title="Send email">✉️</th>{% endif %}
+        <th>Opp.</th>
+        <th>Business</th>
+        <th>Contact</th>
+        <th>Website</th>
+        <th>Scores<br><span class="small">web / seo / mod</span></th>
+        <th>Recommendation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in leads %}
+      <tr>
+        {% if mail_ready %}
+        <td class="small">
+          {% if l.emailed_at %}<span class="sent" title="{{ l.emailed_at }}">✓ sent</span>
+          {% elif l.email %}<input type="checkbox" class="pick" name="lead_ids" value="{{ l.id }}">
+          {% else %}<span class="muted" title="No public email">—</span>{% endif %}
+        </td>
+        {% endif %}
+        <td><span class="badge {{ l.opportunity }}">{{ l.opportunity }}</span></td>
+        <td>
+          <strong>{{ l.name }}</strong>
+          {% if l.category %}<div class="small">{{ l.category }}</div>{% endif %}
+          {% if l.address %}<div class="small">{{ l.address }}</div>{% endif %}
+          <div class="small">
+            {% if l.gmaps_url %}<a href="{{ l.gmaps_url }}" target="_blank" rel="noopener">Map</a> &middot; {% endif %}
+            <a href="/lead/{{ l.id }}"><strong>▸ Sales tools</strong></a>
+          </div>
+        </td>
+        <td class="small">
+          {% if l.phone %}<div>{{ l.phone }}</div>{% endif %}
+          {% if l.email %}<div><a href="mailto:{{ l.email }}">{{ l.email }}</a></div>{% endif %}
+          {% if l.facebook %}<div><a href="{{ l.facebook }}" target="_blank" rel="noopener">Facebook</a></div>{% endif %}
+          {% if l.instagram %}<div><a href="{{ l.instagram }}" target="_blank" rel="noopener">Instagram</a></div>{% endif %}
+          {% if l.linkedin %}<div><a href="{{ l.linkedin }}" target="_blank" rel="noopener">LinkedIn</a></div>{% endif %}
+          {% if not (l.phone or l.email or l.facebook or l.instagram or l.linkedin) %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td class="small">
+          {% if l.has_website %}
+            <a href="{{ l.website }}" target="_blank" rel="noopener">Visit</a>
+            <div>{{ 'HTTPS' if l.https else 'no HTTPS' }} &middot; {{ 'mobile' if l.mobile_friendly else 'not mobile' }}</div>
+            {% if l.load_ms %}<div>{{ l.load_ms }} ms</div>{% endif %}
+          {% else %}
+            <strong class="muted">none</strong>
+          {% endif %}
+        </td>
+        <td class="score">
+          {% if l.has_website %}{{ l.website_score }} / {{ l.seo_score }} / {{ l.modernization_score }}{% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td class="rec">{{ l.recommendation }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="{% if mail_ready %}7{% else %}6{% endif %}" class="muted">No leads yet. Run a search above.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  </form>
+
+  <footer>
+    LeadScout &middot; self-hosted &amp; open-source &middot; data from OpenStreetMap (ODbL).
+    Review counts and star ratings are not available from free data sources and are left blank.
+    Use responsibly and respect local outreach / anti-spam laws.
+  </footer>
+
+</div>
+
+<div id="overlay">
+  <div class="spinner"></div>
+  <div class="txt">Scanning &amp; analysing websites…</div>
+</div>
+
+<script>
+  // Dark-mode toggle (persisted).
+  (function () {
+    var btn = document.getElementById("themeBtn");
+    function icon() {
+      btn.textContent = document.documentElement.getAttribute("data-theme") === "dark" ? "☀️" : "🌙";
+    }
+    icon();
+    btn.addEventListener("click", function () {
+      var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      icon();
+    });
+  })();
+
+  // Show the scanning overlay while a search runs.
+  (function () {
+    var form = document.querySelector("form.search");
+    if (form) form.addEventListener("submit", function () {
+      document.getElementById("overlay").classList.add("show");
+    });
+  })();
+
+  // "Select all emailable" checkbox.
+  (function () {
+    var all = document.getElementById("selectAll");
+    if (!all) return;
+    all.addEventListener("change", function () {
+      document.querySelectorAll("input.pick").forEach(function (c) { c.checked = all.checked; });
+    });
+  })();
+
+  // Confirm before batch-sending real emails.
+  function confirmSend() {
+    var n = document.querySelectorAll("input.pick:checked").length;
+    if (n === 0) { alert("Tick at least one business (only ones with an email can be selected)."); return false; }
+    return confirm("Send " + n + " outreach email(s) from your email account now? Make sure you've reviewed the draft on a Sales-tools page first.");
+  }
+</script>
+</body>
+</html>

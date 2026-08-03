@@ -1,0 +1,17 @@
+#!/bin/bash
+# LeadScout launcher — starts the app in a native window (no browser).
+# The project path is embedded so the .app works even if moved to /Applications.
+
+PROJECT="/Users/premmo/Documents/VSCODE PROJECTS 26/HelpbussenswithnowebsiteV2"
+cd "$PROJECT" || { osascript -e 'display alert "LeadScout" message "Project folder not found. Edit the path in LeadScout.app/Contents/MacOS/LeadScout."'; exit 1; }
+
+PY="$PROJECT/.venv/bin/python"
+
+# First run (or if the environment is missing): set it up.
+if [ ! -x "$PY" ]; then
+    /usr/bin/env python3 -m venv .venv || { osascript -e 'display alert "LeadScout" message "Python 3 is required. Install it from python.org, then try again."'; exit 1; }
+    "$PY" -m pip install --upgrade pip >/dev/null 2>&1
+    "$PY" -m pip install -r requirements.txt || { osascript -e 'display alert "LeadScout" message "Failed to install dependencies. Open Terminal and run: .venv/bin/pip install -r requirements.txt"'; exit 1; }
+fi
+
+exec "$PY" -m app.desktop

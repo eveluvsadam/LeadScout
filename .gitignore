@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# App data
+data/
+*.db
+*.sqlite3
+
+# Local config
+.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Local editor/agent settings
+.claude/settings.local.json

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="LeadScout logo">
+  <rect width="64" height="64" rx="10" fill="#1f3a5f"/>
+  <!-- map pin -->
+  <path d="M32 14c-7.2 0-13 5.6-13 12.6 0 9 13 20.4 13 20.4s13-11.4 13-20.4C45 19.6 39.2 14 32 14z"
+        fill="#ffffff"/>
+  <circle cx="32" cy="26.5" r="5.2" fill="#1f3a5f"/>
+  <!-- magnifier ring + handle -->
+  <circle cx="39" cy="33" r="9" fill="none" stroke="#ffcf33" stroke-width="3.2"/>
+  <line x1="45.6" y1="39.6" x2="52" y2="46" stroke="#ffcf33" stroke-width="3.6" stroke-linecap="round"/>
+</svg>
