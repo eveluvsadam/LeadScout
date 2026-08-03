@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales tools — {{ lead.name }}</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/style.css">
+<script>
+  (function () {
+    var t = localStorage.getItem("theme");
+    if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
+</head>
+<body data-lead="{{ lead.id }}">
+<div class="wrap">
+
+  <header>
+    <img src="/static/logo.svg" alt="LeadScout logo">
+    <div>
+      <h1>Sales tools</h1>
+      <p class="tagline"><a href="/">&larr; Back to leads</a></p>
+    </div>
+    <button type="button" id="themeBtn" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+  </header>
+  <hr>
+
+  <!-- ===== Business summary ===== -->
+  <div class="panel lead-summary">
+    <h2 style="border:0;margin:0 0 6px">{{ lead.name }}</h2>
+    <div class="small">
+      {% if lead.category %}{{ lead.category }} &middot; {% endif %}
+      {% if lead.address %}{{ lead.address }} &middot; {% endif %}
+      {% if lead.phone %}{{ lead.phone }} &middot; {% endif %}
+      {% if lead.gmaps_url %}<a href="{{ lead.gmaps_url }}" target="_blank" rel="noopener">Map</a> &middot; {% endif %}
+      <span class="badge {{ lead.opportunity }}">{{ lead.opportunity }} opportunity</span>
+    </div>
+    <p class="small" style="margin-top:6px">
+      {% if lead.has_website %}Website: <a href="{{ lead.website }}" target="_blank" rel="noopener">{{ lead.website }}</a>{% else %}<strong>No website detected.</strong>{% endif %}
+    </p>
+  </div>
+
+  <div class="draftbar">⚠ All content below is an auto-generated <strong>draft</strong> for manual review. Nothing is sent automatically. No reviews, owner names, or contact details are invented.</div>
+
+  <!-- ===== Opportunity report ===== -->
+  <h2>Website opportunity report</h2>
+  <div class="panel report-grid">
+    <div>
+      <h3>Why they need a website</h3>
+      <ul>{% for r in report.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+    </div>
+    <div>
+      <h3>Estimated benefits</h3>
+      <ul>{% for b in report.benefits %}<li>{{ b }}</li>{% endfor %}</ul>
+    </div>
+    <div>
+      <h3>Suggested improvements</h3>
+      <ul>{% for s in report.suggestions %}<li>{{ s }}</li>{% endfor %}</ul>
+    </div>
+  </div>
+
+  <!-- ===== Reviews ===== -->
+  <h2>Reviews &amp; testimonials</h2>
+  <div class="panel">
+    {% if lead.rating and lead.review_count %}
+      <p><strong>{{ lead.rating }} ★</strong> &middot; {{ lead.review_count }} reviews</p>
+    {% else %}
+      <p>No star rating is available here — Google's ratings need a paid API, so this free tool doesn't pull them. That's normal, not an error.</p>
+      <p class="small">Got real reviews from the business (Google, Facebook, word of mouth)? Type them into the <strong>Testimonials</strong> boxes in the demo generator below and they'll appear on the demo site. Only add genuine reviews — nothing is invented for you.</p>
+    {% endif %}
+  </div>
+
+  <!-- ===== Sales email ===== -->
+  <h2>Sales email draft</h2>
+  <div class="panel">
+    <label class="small">Subject</label>
+    <input type="text" id="emailSubject" value="{{ email.subject }}" style="width:100%;margin-bottom:8px">
+    <label class="small">Body (edit before sending)</label>
+    <textarea id="emailBody" class="email-body" rows="18">{{ email.body }}</textarea>
+    <div class="btnrow">
+      <button type="button" onclick="copyEmail()">Copy email</button>
+      <button type="button" onclick="downloadEmail()">Download .txt</button>
+      <button type="button" class="ghost" onclick="resetEmail()">Reset</button>
+      <span id="copyMsg" class="small"></span>
+    </div>
+    <p class="small">Emails are never sent automatically — copy or download this draft and send it yourself after review.</p>
+  </div>
+
+  <!-- ===== Phone call script ===== -->
+  <h2>Phone call script</h2>
+  <div class="panel">
+    <p class="small">What to say when you get the owner or manager on the phone. Personalised to this business — keep it friendly and low-pressure.</p>
+    {% for sec in script %}
+      <div class="script-sec">
+        <h3>{{ sec.title }}</h3>
+        <ul>{% for line in sec.lines %}<li>{{ line }}</li>{% endfor %}</ul>
+      </div>
+    {% endfor %}
+    <textarea id="scriptText" class="hidden-field" rows="2">{{ script_text }}</textarea>
+    <div class="btnrow">
+      <button type="button" onclick="copyScript()">Copy script</button>
+      <button type="button" onclick="downloadScript()">Download .txt</button>
+      <span id="scriptMsg" class="small"></span>
+    </div>
+  </div>
+
+  <!-- ===== Demo website ===== -->
+  <h2>Demo website generator</h2>
+  <div class="panel">
+    <p class="small">Pages for this business type: <strong>{{ pages | join(" · ") }}</strong></p>
+    <div class="controls">
+      <div class="field"><label>Headline</label><input id="c_headline" value="{{ lead.name }}"></div>
+      <div class="field"><label>Tagline</label><input id="c_tagline" placeholder="(auto)"></div>
+      <div class="field"><label>Primary color</label><input id="c_color" type="color" value="#2563eb"></div>
+      <div class="field"><label>Phone</label><input id="c_phone" value="{{ lead.phone or '' }}"></div>
+      <div class="field"><label>Email</label><input id="c_email" value="{{ lead.email or '' }}"></div>
+      <div class="field"><label>Address</label><input id="c_address" value="{{ lead.address or '' }}"></div>
+      <div class="field"><label>Hours</label><input id="c_hours" placeholder="Mon–Fri 9–5"></div>
+    </div>
+
+    <div class="testi-box">
+      <div class="small" style="margin-bottom:6px"><strong>Photos</strong> (optional). Paste the business's <em>own</em> image URLs — from photos they send you, or their Facebook/existing site. <strong>Don't use Google/Maps photos</strong> (copyright). Leave blank to show free sample photos you can replace later.</div>
+      <div class="testi-row" style="grid-template-columns:1fr"><input id="hero" placeholder="Hero background image URL (optional)"></div>
+      <div class="testi-row" style="grid-template-columns:1fr 1fr 1fr">
+        <input id="img1" placeholder="Photo 1 URL">
+        <input id="img2" placeholder="Photo 2 URL">
+        <input id="img3" placeholder="Photo 3 URL">
+      </div>
+    </div>
+
+    <div class="testi-box">
+      <div class="small" style="margin-bottom:6px"><strong>Testimonials</strong> (optional — only add real reviews). These appear on the demo site.</div>
+      <div class="testi-row"><input id="r1" placeholder="Review 1 — what the customer said"><input id="r1by" placeholder="Customer name"></div>
+      <div class="testi-row"><input id="r2" placeholder="Review 2 — what the customer said"><input id="r2by" placeholder="Customer name"></div>
+      <div class="testi-row"><input id="r3" placeholder="Review 3 — what the customer said"><input id="r3by" placeholder="Customer name"></div>
+    </div>
+
+    <div class="btnrow" style="margin:10px 0"><button type="button" onclick="updateDemo()">Update preview</button></div>
+
+    <div class="device-btns">
+      <button type="button" onclick="setDevice('desktop')" id="dBtn" class="active">Desktop</button>
+      <button type="button" onclick="setDevice('mobile')" id="mBtn">Mobile</button>
+      <a id="demoOpen" href="/lead/{{ lead.id }}/demo" target="_blank" rel="noopener" class="ghost-link">Open in new tab ↗</a>
+      <a id="demoZip" href="/lead/{{ lead.id }}/demo.zip" class="ghost-link">⬇ Export website (ZIP)</a>
+    </div>
+
+    <div class="preview-frame" id="previewFrame">
+      <iframe id="demoIframe" src="/lead/{{ lead.id }}/demo" title="Demo website preview"></iframe>
+    </div>
+    <p class="small">The ZIP contains index.html, style.css, script.js, README and deployment instructions — a complete static website you can host anywhere free.</p>
+  </div>
+
+  <!-- ===== Publish for free ===== -->
+  <h2>Once you close the deal: publish it free</h2>
+  <div class="panel">
+    <p class="small">The exported ZIP is a complete website you can put online for free — no coding. Full step-by-step is in the <code>DEPLOY.md</code> file inside the ZIP. Quick version:</p>
+    <ol class="publish-steps">
+      <li><strong>Export</strong> the website ZIP above and unzip it.</li>
+      <li><strong>Get the real details</strong> from your new client (phone, address, hours, services, photos) and replace the draft placeholders in <code>index.html</code>.</li>
+      <li><strong>Put it online free</strong> — the easiest way: go to <a href="https://app.netlify.com/drop" target="_blank" rel="noopener">app.netlify.com/drop</a> and drag the folder in. You instantly get a live link like <code>their-shop.netlify.app</code>. (Cloudflare Pages and GitHub Pages also work, all free.)</li>
+      <li><strong>Contact form</strong> already works for free — it's wired to <a href="https://formsubmit.co" target="_blank" rel="noopener">FormSubmit</a>. Set the client's email in the demo's Email box before exporting; they confirm it once and every enquiry emails them automatically.</li>
+      <li><strong>Custom domain</strong> (optional): a domain is ~$10/year (Namecheap, Cloudflare, Porkbun); hosting stays free. Point it at the host in its "custom domain" settings.</li>
+    </ol>
+    <p class="small">So your only possible cost is a domain name if the client wants one — the website and hosting are 100% free.</p>
+  </div>
+
+  <!-- ===== Package estimator ===== -->
+  <h2>Website package estimator</h2>
+  <div class="panel">
+    <p class="small">Suggested pricing — edit any price to match your rates.</p>
+    <div class="pkg-grid">
+      {% for p in packages %}
+      <div class="pkg">
+        <h3>{{ p.name }}</h3>
+        <div class="price">$<input type="number" value="{{ p.price }}" class="price-input"></div>
+        <ul>{% for f in p.features %}<li>{{ f }}</li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <footer>
+    LeadScout sales tools &middot; all generated content is a draft for review &middot; only publicly available data is used.
+    Do not send emails automatically, invent reviews/testimonials, or claim unverified results.
+  </footer>
+
+</div>
+
+<script>
+  // Theme toggle
+  (function () {
+    var btn = document.getElementById("themeBtn");
+    function icon(){ btn.textContent = document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"; }
+    icon();
+    btn.addEventListener("click", function(){
+      var n = document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";
+      document.documentElement.setAttribute("data-theme", n); localStorage.setItem("theme", n); icon();
+    });
+  })();
+
+  var LEAD = document.body.getAttribute("data-lead");
+  var DEFAULT_SUBJECT = document.getElementById("emailSubject").value;
+  var DEFAULT_BODY = document.getElementById("emailBody").value;
+
+  // ----- Email -----
+  function emailText(){
+    return "Subject: " + document.getElementById("emailSubject").value + "\n\n" +
+           document.getElementById("emailBody").value;
+  }
+  function copyEmail(){
+    navigator.clipboard.writeText(emailText()).then(function(){
+      flash("Copied to clipboard.");
+    }, function(){ flash("Press Ctrl/Cmd+C to copy."); });
+  }
+  function downloadEmail(){
+    var blob = new Blob([emailText()], {type:"text/plain"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "outreach-email.txt"; a.click();
+    URL.revokeObjectURL(a.href); flash("Downloaded.");
+  }
+  function resetEmail(){
+    document.getElementById("emailSubject").value = DEFAULT_SUBJECT;
+    document.getElementById("emailBody").value = DEFAULT_BODY; flash("Reset to draft.");
+  }
+  function flash(m){ var e=document.getElementById("copyMsg"); e.textContent=m; setTimeout(function(){e.textContent="";},2500); }
+
+  // ----- Call script -----
+  function copyScript(){
+    navigator.clipboard.writeText(document.getElementById("scriptText").value).then(
+      function(){ flashScript("Copied to clipboard."); },
+      function(){ flashScript("Press Ctrl/Cmd+C to copy."); });
+  }
+  function downloadScript(){
+    var blob = new Blob([document.getElementById("scriptText").value], {type:"text/plain"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "call-script.txt"; a.click();
+    URL.revokeObjectURL(a.href); flashScript("Downloaded.");
+  }
+  function flashScript(m){ var e=document.getElementById("scriptMsg"); e.textContent=m; setTimeout(function(){e.textContent="";},2500); }
+
+  // ----- Demo website preview / export -----
+  function demoParams(){
+    var p = new URLSearchParams();
+    var map = {color:"c_color", headline:"c_headline", tagline:"c_tagline",
+               phone:"c_phone", email:"c_email", address:"c_address", hours:"c_hours",
+               r1:"r1", r1by:"r1by", r2:"r2", r2by:"r2by", r3:"r3", r3by:"r3by",
+               hero:"hero", img1:"img1", img2:"img2", img3:"img3"};
+    for (var k in map){ var v=document.getElementById(map[k]).value; if(v) p.set(k, v); }
+    return p.toString();
+  }
+  function updateDemo(){
+    var q = demoParams();
+    document.getElementById("demoIframe").src = "/lead/"+LEAD+"/demo" + (q?"?"+q:"");
+    document.getElementById("demoOpen").href = "/lead/"+LEAD+"/demo" + (q?"?"+q:"");
+    document.getElementById("demoZip").href  = "/lead/"+LEAD+"/demo.zip" + (q?"?"+q:"");
+  }
+  function setDevice(d){
+    document.getElementById("previewFrame").className = "preview-frame " + d;
+    document.getElementById("dBtn").classList.toggle("active", d==="desktop");
+    document.getElementById("mBtn").classList.toggle("active", d==="mobile");
+  }
+</script>
+</body>
+</html>
