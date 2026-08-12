@@ -5,7 +5,9 @@ location, pulls businesses from OpenStreetMap, analyses each website, scores
 it, and stores the leads in SQLite.
 """
 import asyncio
+import base64
 import io
+import secrets
 import zipfile
 from pathlib import Path
 
@@ -13,6 +15,9 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from .config import APP_PASSWORD
 
 import time
 
@@ -29,6 +34,30 @@ from .recommend import build_recommendation
 
 BASE_DIR = Path(__file__).resolve().parent
 app = FastAPI(title="LeadScout", version="2.0.0")
+
+
+class PasswordGate(BaseHTTPMiddleware):
+    """When APP_PASSWORD is set, require it (HTTP Basic) on every page.
+    Health checks and static assets stay open so hosting platforms work."""
+    async def dispatch(self, request, call_next):
+        if not APP_PASSWORD:
+            return await call_next(request)
+        path = request.url.path
+        if path == "/healthz" or path.startswith("/static"):
+            return await call_next(request)
+        header = request.headers.get("Authorization", "")
+        if header.startswith("Basic "):
+            try:
+                _, _, pw = base64.b64decode(header[6:]).decode().partition(":")
+                if secrets.compare_digest(pw, APP_PASSWORD):
+                    return await call_next(request)
+            except Exception:
+                pass
+        return Response("Authentication required", status_code=401,
+                        headers={"WWW-Authenticate": 'Basic realm="LeadScout"'})
+
+
+app.add_middleware(PasswordGate)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 

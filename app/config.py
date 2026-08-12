@@ -47,6 +47,11 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SEND_DELAY_SECONDS = float(os.getenv("SEND_DELAY_SECONDS", "1.5"))  # gap between sends
 MAX_BATCH_SEND = int(os.getenv("MAX_BATCH_SEND", "25"))  # safety cap per batch
 
+# Optional password gate. When set, every page requires this password (HTTP
+# Basic auth). Leave blank for local use (the Mac app). ALWAYS set it before
+# hosting the app on the public internet, since there is no user login.
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+
 # Safety caps so a single search stays fast and polite.
 MAX_BUSINESSES = int(os.getenv("MAX_BUSINESSES", "60"))       # a single city
 MAX_BUSINESSES_STATE = int(os.getenv("MAX_BUSINESSES_STATE", "250"))  # a whole state

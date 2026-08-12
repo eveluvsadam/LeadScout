@@ -1,0 +1,30 @@
+# Auto-deploy blueprint for Render (https://render.com).
+# Connect this GitHub repo once in Render; after that every push auto-deploys.
+# It builds the Dockerfile in this repo. Set the secret values in the Render
+# dashboard (they are intentionally not stored here).
+services:
+  - type: web
+    name: leadscout
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # REQUIRED before going public — protects the whole app with a password.
+      - key: APP_PASSWORD
+        sync: false
+      # Your outreach identity (used in emails / call scripts).
+      - key: SELLER_NAME
+        sync: false
+      - key: SELLER_COMPANY
+        sync: false
+      - key: SELLER_PHONE
+        sync: false
+      - key: SELLER_EMAIL
+        sync: false
+      # NOTE: many hosts (incl. Cloudflare) block SMTP, so email sending may not
+      # work when hosted. Leave this unset to keep sending on your local Mac app.
+      - key: SELLER_EMAIL_APP_PASSWORD
+        sync: false
+      - key: USER_AGENT
+        sync: false
