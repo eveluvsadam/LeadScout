@@ -2,6 +2,11 @@
 # Connect this GitHub repo once in Render; after that every push auto-deploys.
 # It builds the Dockerfile in this repo. Set the secret values in the Render
 # dashboard (they are intentionally not stored here).
+databases:
+  # Persistent Postgres so your leads survive restarts/redeploys.
+  - name: leadscout-db
+    plan: free
+
 services:
   - type: web
     name: leadscout
@@ -10,6 +15,11 @@ services:
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
+      # Connects the app to the Postgres database above (persistent storage).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: leadscout-db
+          property: connectionString
       # REQUIRED before going public — protects the whole app with a password.
       - key: APP_PASSWORD
         sync: false

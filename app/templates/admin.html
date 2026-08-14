@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — LeadScout</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/style.css">
+<script>
+  (function () {
+    var t = localStorage.getItem("theme");
+    if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="/static/logo.svg" alt="LeadScout logo">
+    <div>
+      <h1>Admin</h1>
+      <p class="tagline"><a href="/">&larr; Back to leads</a></p>
+    </div>
+    <button type="button" id="themeBtn" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
+  </header>
+  <hr>
+
+  <!-- ===== Overview ===== -->
+  <h2>Overview</h2>
+  <div class="tiles">
+    <div class="tile"><div class="num">{{ stats.total }}</div><div class="lbl">Total leads</div></div>
+    <div class="tile"><div class="num">{{ searches|length }}</div><div class="lbl">Searches</div></div>
+    <div class="tile"><div class="num">{{ stats.callable }}</div><div class="lbl">Callable</div></div>
+    <div class="tile"><div class="num">{{ stats.emailable }}</div><div class="lbl">Have email</div></div>
+    <div class="tile"><div class="num">{{ stats.emailed }}</div><div class="lbl">Emailed</div></div>
+    <div class="tile"><div class="num">{{ stats.no_website }}</div><div class="lbl">No website</div></div>
+  </div>
+
+  <!-- ===== Searches ===== -->
+  <h2>Past searches</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>#</th><th>Location</th><th>Category</th><th>Leads</th><th>When</th><th></th></tr></thead>
+    <tbody>
+      {% for s in searches %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>{{ [s.city, s.state, s.country]|select|join(', ') }}</td>
+        <td>{{ s.category }}</td>
+        <td>{{ s.result_count }}</td>
+        <td class="small">{{ s.created_at }}</td>
+        <td>
+          <a href="/?">view</a> &middot;
+          <form method="post" action="/admin/delete-search" style="display:inline" onsubmit="return confirm('Delete search #{{ s.id }} and its leads?')">
+            <input type="hidden" name="search_id" value="{{ s.id }}">
+            <button type="submit" class="ghost" style="padding:2px 8px">delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No searches yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <form method="post" action="/admin/delete-all" onsubmit="return confirm('Delete ALL leads and searches? This cannot be undone.')" style="margin-top:10px">
+    <button type="submit" class="ghost" style="border-color:#c0392b;color:#c0392b">🗑 Delete all leads &amp; searches</button>
+  </form>
+
+  <!-- ===== Emailed ===== -->
+  <h2>Emailed businesses ({{ emailed|length }})</h2>
+  <div class="panel">
+    {% if emailed %}
+    <table>
+      <thead><tr><th>Business</th><th>Email</th><th>Sent</th></tr></thead>
+      <tbody>
+        {% for l in emailed %}
+        <tr><td>{{ l.name }}</td><td class="small">{{ l.email }}</td><td class="small">{{ l.emailed_at }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted" style="text-align:left">No emails sent yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- ===== Package pricing (editable, saved) ===== -->
+  <h2>Package pricing</h2>
+  <form method="post" action="/admin/packages" class="panel">
+    <p class="small">Edit your pricing packages — saved to the database and used on every lead's Sales-tools page.</p>
+    <div class="pkg-grid">
+      {% for p in packages %}
+      <div class="pkg">
+        <input name="name" value="{{ p.name }}" style="font-weight:bold;width:100%">
+        <div class="price">$<input type="number" name="price" value="{{ p.price }}" class="price-input"></div>
+        <textarea name="features" rows="5" style="width:100%;font-size:12px">{{ p.features|join('\n') }}</textarea>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="btnrow"><button type="submit">Save packages</button></div>
+  </form>
+
+  <!-- ===== Settings / status ===== -->
+  <h2>Settings &amp; status</h2>
+  <div class="panel">
+    <ul>
+      <li><strong>Database:</strong> {{ db_kind }}</li>
+      <li><strong>Email sending:</strong> {{ 'ON ✓' if mail_ready else 'off (add SELLER_EMAIL_APP_PASSWORD in .env)' }}</li>
+      <li><strong>Your name:</strong> {{ seller.name or '[not set]' }}</li>
+      <li><strong>Company:</strong> {{ seller.company or '[not set]' }}</li>
+      <li><strong>Phone:</strong> {{ seller.phone or '[not set]' }}</li>
+      <li><strong>Email:</strong> {{ seller.email or '[not set]' }}</li>
+    </ul>
+    <p class="small">Your name, phone, email and passwords are set in the <code>.env</code> file (kept out of git). Edit them there and restart.</p>
+  </div>
+
+  <footer>LeadScout admin &middot; changes here affect your live app.</footer>
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById("themeBtn");
+    function icon(){ btn.textContent = document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"; }
+    icon();
+    btn.addEventListener("click", function(){
+      var n = document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";
+      document.documentElement.setAttribute("data-theme", n); localStorage.setItem("theme", n); icon();
+    });
+  })();
+</script>
+</body>
+</html>

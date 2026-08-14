@@ -6,8 +6,19 @@ from dotenv import load_dotenv
 # Load a local .env file if present (your private details live here, not in git).
 load_dotenv()
 
-# Where the SQLite file lives. In Docker this is a mounted volume.
+# Where the SQLite file lives (used when DATABASE_URL is not set).
 DB_PATH = os.getenv("DB_PATH", "data/leadscout.db")
+
+# Database backend. Defaults to a local SQLite file. Set DATABASE_URL to a
+# Postgres URL (e.g. Render's) to use a persistent hosted database instead.
+# Render/Heroku give "postgres://..."; we normalise it for SQLAlchemy.
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgres://"):]
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgresql://"):]
+if not DATABASE_URL:
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # OpenStreetMap services (100% free, no API key, no billing).
 NOMINATIM_URL = os.getenv("NOMINATIM_URL", "https://nominatim.openstreetmap.org/search")

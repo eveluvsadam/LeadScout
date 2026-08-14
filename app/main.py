@@ -7,6 +7,7 @@ it, and stores the leads in SQLite.
 import asyncio
 import base64
 import io
+import json
 import secrets
 import zipfile
 from pathlib import Path
@@ -216,7 +217,7 @@ def lead_detail(request: Request, lead_id: int):
         "lead": lead,
         "email": sales.generate_email(lead),
         "report": sales.opportunity_report(lead),
-        "packages": sales.DEFAULT_PACKAGES,
+        "packages": get_packages(),
         "pages": website.page_structure(lead.get("category") or ""),
         "script": script,
         "script_text": sales.script_to_text(script),
@@ -296,6 +297,63 @@ def send_batch(request: Request, lead_ids: list[int] = Form([])):
     if failed and first_error:
         msg["error"] = f"{failed} failed to send. First error: {first_error}"
     return _render(request, send_result=msg)
+
+
+# --------------------------------------------------------------------------- #
+#  Admin dashboard: manage searches, leads, sent emails, package pricing       #
+# --------------------------------------------------------------------------- #
+def get_packages() -> list:
+    raw = db.get_setting("packages")
+    if raw:
+        try:
+            return json.loads(raw)
+        except Exception:
+            pass
+    return sales.DEFAULT_PACKAGES
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin(request: Request):
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "stats": db.stats(),
+        "searches": db.list_searches(),
+        "emailed": db.query_leads(emailed_only=True, limit=500),
+        "packages": get_packages(),
+        "mail_ready": mailer.is_configured(),
+        "seller": {
+            "name": sales.SELLER_NAME, "company": sales.SELLER_COMPANY,
+            "phone": sales.SELLER_PHONE, "email": sales.SELLER_EMAIL,
+        },
+        "db_kind": "PostgreSQL" if "postgresql" in str(db.engine.url) else "SQLite",
+    })
+
+
+@app.post("/admin/delete-search")
+def admin_delete_search(search_id: int = Form(...)):
+    db.delete_search(search_id)
+    return Response(status_code=303, headers={"Location": "/admin"})
+
+
+@app.post("/admin/delete-all")
+def admin_delete_all():
+    db.delete_all_leads()
+    return Response(status_code=303, headers={"Location": "/admin"})
+
+
+@app.post("/admin/packages")
+def admin_packages(name: list[str] = Form([]), price: list[str] = Form([]),
+                   features: list[str] = Form([])):
+    packages = []
+    for i, nm in enumerate(name):
+        try:
+            pr = int(float(price[i]))
+        except (ValueError, IndexError):
+            pr = 0
+        feats = [f.strip() for f in (features[i] if i < len(features) else "").splitlines() if f.strip()]
+        packages.append({"name": nm, "price": pr, "features": feats})
+    db.set_setting("packages", json.dumps(packages))
+    return Response(status_code=303, headers={"Location": "/admin"})
 
 
 # --------------------------------------------------------------------------- #

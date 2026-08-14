@@ -7,3 +7,5 @@ openpyxl==3.1.5
 python-multipart==0.0.9
 python-dotenv==1.0.1
 pywebview==5.1
+SQLAlchemy>=2.0
+psycopg[binary]>=3.1
