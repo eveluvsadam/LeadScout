@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ 'Set up admin' if setup else 'Admin login' }} — LeadScout</title>
+<link rel="icon" type="image/svg+xml" href="/static/logo.svg">
+<link rel="stylesheet" href="/static/style.css">
+<script>
+  (function () {
+    var t = localStorage.getItem("theme");
+    if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  })();
+</script>
+</head>
+<body>
+<div class="wrap" style="max-width:460px">
+
+  <header>
+    <img src="/static/logo.svg" alt="LeadScout logo">
+    <div>
+      <h1>Admin</h1>
+      <p class="tagline"><a href="/">&larr; Back to leads</a></p>
+    </div>
+  </header>
+  <hr>
+
+  {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
+
+  {% if setup %}
+  <h2>Create your admin password</h2>
+  <div class="panel">
+    <p class="small">First time here — set a password to lock the admin page. It's stored only in <em>this</em> copy's database, so it never ends up on GitHub. A fresh copy or deployment starts here again with its own new password.</p>
+    <form method="post" action="/admin/setup" class="form" style="display:flex;flex-direction:column;gap:10px">
+      <input type="password" name="password" placeholder="New password (6+ characters)" required autofocus>
+      <input type="password" name="confirm" placeholder="Confirm password" required>
+      <button type="submit">Set password &amp; open admin</button>
+    </form>
+  </div>
+  {% else %}
+  <h2>Admin login</h2>
+  <div class="panel">
+    <form method="post" action="/admin/login" class="form" style="display:flex;flex-direction:column;gap:10px">
+      <input type="password" name="password" placeholder="Admin password" required autofocus>
+      <button type="submit">Log in</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <footer>Only the admin dashboard is locked. The main lead finder is unaffected.</footer>
+</div>
+</body>
+</html>

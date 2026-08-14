@@ -6,6 +6,7 @@ it, and stores the leads in SQLite.
 """
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import secrets
@@ -312,8 +313,54 @@ def get_packages() -> list:
     return sales.DEFAULT_PACKAGES
 
 
+# ---- Admin password (set on first use, stored hashed in the DB, never in git) #
+def _admin_password_set() -> bool:
+    return bool(db.get_setting("admin_pw_hash"))
+
+
+def _set_admin_password(pw: str) -> None:
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), 200_000).hex()
+    db.set_setting("admin_pw_salt", salt)
+    db.set_setting("admin_pw_hash", h)
+
+
+def _verify_admin_password(pw: str) -> bool:
+    salt, h = db.get_setting("admin_pw_salt"), db.get_setting("admin_pw_hash")
+    if not salt or not h:
+        return False
+    calc = hashlib.pbkdf2_hmac("sha256", pw.encode(), bytes.fromhex(salt), 200_000).hex()
+    return secrets.compare_digest(calc, h)
+
+
+def _new_admin_session() -> str:
+    token = secrets.token_urlsafe(32)
+    db.set_setting("admin_session", token)
+    return token
+
+
+def _admin_authed(request: Request) -> bool:
+    token = db.get_setting("admin_session")
+    cookie = request.cookies.get("admin_session")
+    return bool(token and cookie and secrets.compare_digest(cookie, token))
+
+
+def _login_cookie(token: str) -> Response:
+    r = Response(status_code=303, headers={"Location": "/admin"})
+    r.set_cookie("admin_session", token, httponly=True, samesite="lax",
+                 max_age=60 * 60 * 24 * 30)
+    return r
+
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin(request: Request):
+    # First run anywhere (fresh clone/deploy): no password set yet -> set one.
+    if not _admin_password_set():
+        return templates.TemplateResponse("admin_gate.html",
+                                          {"request": request, "setup": True})
+    if not _admin_authed(request):
+        return templates.TemplateResponse("admin_gate.html",
+                                          {"request": request, "setup": False})
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "stats": db.stats(),
@@ -329,21 +376,55 @@ def admin(request: Request):
     })
 
 
+@app.post("/admin/setup")
+def admin_setup(request: Request, password: str = Form(...), confirm: str = Form("")):
+    if _admin_password_set():   # already set — don't allow silent reset
+        return Response(status_code=303, headers={"Location": "/admin"})
+    if len(password) < 6 or password != confirm:
+        return templates.TemplateResponse("admin_gate.html", {
+            "request": request, "setup": True,
+            "error": "Passwords must match and be at least 6 characters."})
+    _set_admin_password(password)
+    return _login_cookie(_new_admin_session())
+
+
+@app.post("/admin/login")
+def admin_login(request: Request, password: str = Form(...)):
+    if not _verify_admin_password(password):
+        return templates.TemplateResponse("admin_gate.html", {
+            "request": request, "setup": False, "error": "Wrong password."})
+    return _login_cookie(_new_admin_session())
+
+
+@app.post("/admin/logout")
+def admin_logout():
+    db.set_setting("admin_session", "")   # invalidates the cookie everywhere
+    r = Response(status_code=303, headers={"Location": "/admin"})
+    r.delete_cookie("admin_session")
+    return r
+
+
 @app.post("/admin/delete-search")
-def admin_delete_search(search_id: int = Form(...)):
+def admin_delete_search(request: Request, search_id: int = Form(...)):
+    if not _admin_authed(request):
+        return Response(status_code=303, headers={"Location": "/admin"})
     db.delete_search(search_id)
     return Response(status_code=303, headers={"Location": "/admin"})
 
 
 @app.post("/admin/delete-all")
-def admin_delete_all():
+def admin_delete_all(request: Request):
+    if not _admin_authed(request):
+        return Response(status_code=303, headers={"Location": "/admin"})
     db.delete_all_leads()
     return Response(status_code=303, headers={"Location": "/admin"})
 
 
 @app.post("/admin/packages")
-def admin_packages(name: list[str] = Form([]), price: list[str] = Form([]),
-                   features: list[str] = Form([])):
+def admin_packages(request: Request, name: list[str] = Form([]),
+                   price: list[str] = Form([]), features: list[str] = Form([])):
+    if not _admin_authed(request):
+        return Response(status_code=303, headers={"Location": "/admin"})
     packages = []
     for i, nm in enumerate(name):
         try:
