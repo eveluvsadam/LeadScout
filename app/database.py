@@ -218,3 +218,10 @@ def set_setting(key: str, value: str) -> None:
                          .values(value=value))
         else:
             conn.execute(insert(settings).values(key=key, value=value))
+
+
+def reset_admin() -> None:
+    """Forget the admin password (and any session) so /admin shows setup again."""
+    with engine.begin() as conn:
+        conn.execute(delete(settings).where(settings.c.key.in_(
+            ["admin_pw_hash", "admin_pw_salt", "admin_session"])))

@@ -63,6 +63,10 @@ MAX_BATCH_SEND = int(os.getenv("MAX_BATCH_SEND", "25"))  # safety cap per batch
 # hosting the app on the public internet, since there is no user login.
 APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 
+# Set ADMIN_RESET=1 to clear the admin password on startup (then remove it).
+# Useful on hosts where you can't open a terminal to run `python -m app.reset_admin`.
+ADMIN_RESET = os.getenv("ADMIN_RESET", "").lower() in ("1", "true", "yes")
+
 # Safety caps so a single search stays fast and polite.
 MAX_BUSINESSES = int(os.getenv("MAX_BUSINESSES", "60"))       # a single city
 MAX_BUSINESSES_STATE = int(os.getenv("MAX_BUSINESSES_STATE", "250"))  # a whole state

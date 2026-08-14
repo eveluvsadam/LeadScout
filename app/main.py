@@ -67,6 +67,10 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 @app.on_event("startup")
 def _startup() -> None:
     db.init_db()
+    from .config import ADMIN_RESET
+    if ADMIN_RESET:
+        db.reset_admin()
+        print("ADMIN_RESET is set: admin password cleared. Remove ADMIN_RESET now.")
 
 
 # --------------------------------------------------------------------------- #
