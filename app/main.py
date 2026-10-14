@@ -6,6 +6,7 @@ it, and stores the leads in SQLite.
 """
 import asyncio
 import base64
+from contextlib import asynccontextmanager
 import hashlib
 import io
 import json
@@ -35,7 +36,19 @@ from .config import (MAX_BUSINESSES, MAX_BUSINESSES_STATE, ANALYZE_CONCURRENCY,
 from .recommend import build_recommendation
 
 BASE_DIR = Path(__file__).resolve().parent
-app = FastAPI(title="LeadScout", version="2.0.0")
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    db.init_db()
+    from .config import ADMIN_RESET
+    if ADMIN_RESET:
+        db.reset_admin()
+        print("ADMIN_RESET is set: admin password cleared. Remove ADMIN_RESET now.")
+    yield
+
+
+app = FastAPI(title="LeadScout", version="2.1.0", lifespan=lifespan)
 
 
 class PasswordGate(BaseHTTPMiddleware):
@@ -62,15 +75,6 @@ class PasswordGate(BaseHTTPMiddleware):
 app.add_middleware(PasswordGate)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    db.init_db()
-    from .config import ADMIN_RESET
-    if ADMIN_RESET:
-        db.reset_admin()
-        print("ADMIN_RESET is set: admin password cleared. Remove ADMIN_RESET now.")
 
 
 # --------------------------------------------------------------------------- #
@@ -159,7 +163,7 @@ def _render(request, **extra):
         ),
     }
     ctx.update(extra)
-    return templates.TemplateResponse("index.html", ctx)
+    return templates.TemplateResponse(request, "index.html", ctx)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -217,7 +221,7 @@ def lead_detail(request: Request, lead_id: int):
     if not lead:
         return HTMLResponse("Lead not found.", status_code=404)
     script = sales.call_script(lead)
-    return templates.TemplateResponse("lead.html", {
+    return templates.TemplateResponse(request, "lead.html", {
         "request": request,
         "lead": lead,
         "email": sales.generate_email(lead),
@@ -349,9 +353,12 @@ def _admin_authed(request: Request) -> bool:
     return bool(token and cookie and secrets.compare_digest(cookie, token))
 
 
-def _login_cookie(token: str) -> Response:
+def _login_cookie(request: Request, token: str) -> Response:
     r = Response(status_code=303, headers={"Location": "/admin"})
-    r.set_cookie("admin_session", token, httponly=True, samesite="lax",
+    # Hosting platforms terminate TLS in front of the app, so honour X-Forwarded-Proto.
+    https = (request.url.scheme == "https"
+             or request.headers.get("x-forwarded-proto", "").split(",")[0].strip() == "https")
+    r.set_cookie("admin_session", token, httponly=True, samesite="lax", secure=https,
                  max_age=60 * 60 * 24 * 30)
     return r
 
@@ -360,12 +367,12 @@ def _login_cookie(token: str) -> Response:
 def admin(request: Request):
     # First run anywhere (fresh clone/deploy): no password set yet -> set one.
     if not _admin_password_set():
-        return templates.TemplateResponse("admin_gate.html",
+        return templates.TemplateResponse(request, "admin_gate.html",
                                           {"request": request, "setup": True})
     if not _admin_authed(request):
-        return templates.TemplateResponse("admin_gate.html",
+        return templates.TemplateResponse(request, "admin_gate.html",
                                           {"request": request, "setup": False})
-    return templates.TemplateResponse("admin.html", {
+    return templates.TemplateResponse(request, "admin.html", {
         "request": request,
         "stats": db.stats(),
         "searches": db.list_searches(),
@@ -385,19 +392,35 @@ def admin_setup(request: Request, password: str = Form(...), confirm: str = Form
     if _admin_password_set():   # already set — don't allow silent reset
         return Response(status_code=303, headers={"Location": "/admin"})
     if len(password) < 6 or password != confirm:
-        return templates.TemplateResponse("admin_gate.html", {
+        return templates.TemplateResponse(request, "admin_gate.html", {
             "request": request, "setup": True,
             "error": "Passwords must match and be at least 6 characters."})
     _set_admin_password(password)
-    return _login_cookie(_new_admin_session())
+    return _login_cookie(request, _new_admin_session())
+
+
+# Failed admin logins per client IP: (count, time of last failure). After
+# LOGIN_MAX_FAILS wrong guesses the IP must wait LOGIN_LOCKOUT_S seconds.
+_login_fails: dict[str, tuple[int, float]] = {}
+LOGIN_MAX_FAILS = 5
+LOGIN_LOCKOUT_S = 300
 
 
 @app.post("/admin/login")
 def admin_login(request: Request, password: str = Form(...)):
+    ip = request.client.host if request.client else "?"
+    fails, last = _login_fails.get(ip, (0, 0.0))
+    if fails >= LOGIN_MAX_FAILS and time.time() - last < LOGIN_LOCKOUT_S:
+        return templates.TemplateResponse(request, "admin_gate.html", {
+            "request": request, "setup": False,
+            "error": "Too many wrong passwords. Wait 5 minutes and try again."},
+            status_code=429)
     if not _verify_admin_password(password):
-        return templates.TemplateResponse("admin_gate.html", {
+        _login_fails[ip] = (fails + 1 if time.time() - last < LOGIN_LOCKOUT_S else 1, time.time())
+        return templates.TemplateResponse(request, "admin_gate.html", {
             "request": request, "setup": False, "error": "Wrong password."})
-    return _login_cookie(_new_admin_session())
+    _login_fails.pop(ip, None)
+    return _login_cookie(request, _new_admin_session())
 
 
 @app.post("/admin/logout")

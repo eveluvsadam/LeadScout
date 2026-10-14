@@ -41,6 +41,18 @@ testimonials. Where data is missing, the site shows clearly-marked placeholders.
 
 ---
 
+## What's new in 2.1
+
+- **Up-to-date stack:** FastAPI 0.143, Starlette 1.8, SQLAlchemy 2.1, pywebview 6
+  and current versions of everything else (1.x pinned mid-2024 releases).
+- **Admin login lockout:** 5 wrong passwords from one address locks it out for
+  5 minutes, so the admin password can't be brute-forced once you host it.
+- **Secure cookies when hosted:** the admin session cookie is marked `Secure`
+  automatically behind HTTPS (including platforms that terminate TLS for you).
+- **Mac app launcher** finds its project folder wherever it lives.
+
+---
+
 ## What data you get per lead
 
 | Field | Source |

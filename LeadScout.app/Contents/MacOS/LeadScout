@@ -2,7 +2,10 @@
 # LeadScout launcher — starts the app in a native window (no browser).
 # The project path is embedded so the .app works even if moved to /Applications.
 
-PROJECT="/Users/premmo/Documents/VSCODE PROJECTS 26/HelpbussenswithnowebsiteV2"
+PROJECT="/Users/premmo/Documents/VSCODE PROJECTS 26/Web & Servers/HelpbussenswithnowebsiteV2 (v2.0)"
+# Prefer the folder this .app sits in when it's still inside the project.
+HERE="$(cd "$(dirname "$0")/../../.." && pwd)"
+[ -f "$HERE/requirements.txt" ] && PROJECT="$HERE"
 cd "$PROJECT" || { osascript -e 'display alert "LeadScout" message "Project folder not found. Edit the path in LeadScout.app/Contents/MacOS/LeadScout."'; exit 1; }
 
 PY="$PROJECT/.venv/bin/python"
