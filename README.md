@@ -37,7 +37,23 @@ All generated content is **template-based and clearly labelled as a draft** for
 review. Nothing is fabricated — no invented owners, contacts, reviews, or
 testimonials. Where data is missing, the site shows clearly-marked placeholders.
 
-![logo](app/static/logo.svg)
+![LeadScout dashboard](docs/dashboard.png)
+
+<details>
+<summary>Sales tools page (opportunity report, email draft, call script, demo site)</summary>
+
+![LeadScout sales tools](docs/sales-tools.png)
+
+</details>
+
+*Screenshots use made-up demo businesses.*
+
+## Run the tests
+
+```bash
+pip install -r requirements.txt pytest
+pytest -q tests      # 19 offline tests, no network needed
+```
 
 ---
 
